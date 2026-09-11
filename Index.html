@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Capture Attendance</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: #1a1a1a;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .card {
+      background: #2a2a2a;
+      border-radius: 20px;
+      width: 100%;
+      max-width: 420px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+
+    .header {
+      background: #3D3D3D;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(154,85,39,0.3);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header h1 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .header p {
+      font-size: 0.7rem;
+      color: #aaa;
+      margin-top: 1px;
+    }
+
+    /* VIDEO AREA */
+    .video-wrapper {
+      position: relative;
+      width: 100%;
+      background: #000;
+      aspect-ratio: 4/3;
+      overflow: hidden;
+    }
+
+    #video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    /* Overlay corner guides */
+    .video-wrapper::before,
+    .video-wrapper::after {
+      content: '';
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      border-color: #9A5527;
+      border-style: solid;
+      z-index: 2;
+    }
+    .video-wrapper::before {
+      top: 12px; left: 12px;
+      border-width: 3px 0 0 3px;
+      border-radius: 4px 0 0 0;
+    }
+    .video-wrapper::after {
+      bottom: 12px; right: 12px;
+      border-width: 0 3px 3px 0;
+      border-radius: 0 0 4px 0;
+    }
+
+    /* Extra corners via spans */
+    .corner-tr, .corner-bl {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      border-color: #9A5527;
+      border-style: solid;
+      z-index: 2;
+    }
+    .corner-tr {
+      top: 12px; right: 12px;
+      border-width: 3px 3px 0 0;
+      border-radius: 0 4px 0 0;
+    }
+    .corner-bl {
+      bottom: 12px; left: 12px;
+      border-width: 0 0 3px 3px;
+      border-radius: 0 0 0 4px;
+    }
+
+    /* Status overlay inside video */
+    #video-status {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 20px;
+      white-space: nowrap;
+      z-index: 3;
+    }
+
+    canvas { display: none; }
+
+    /* PREVIEW */
+    #preview-wrapper {
+      display: none;
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4/3;
+      background: #000;
+      overflow: hidden;
+    }
+
+    #photo-preview {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .preview-badge {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(16,185,129,0.9);
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 4px 14px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+
+    /* CONTROLS */
+    .controls {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 13px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      flex: 1;
+    }
+
+    button:active { transform: scale(0.97); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+    .btn-capture {
+      background: #9A5527;
+      color: #fff;
+      font-size: 1rem;
+      padding: 16px;
+    }
+    .btn-capture:hover:not(:disabled) { background: #7E4520; }
+
+    .btn-switch {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      flex: 0 0 auto;
+      padding: 13px 16px;
+    }
+    .btn-switch:hover { background: rgba(255,255,255,0.18); }
+
+    .btn-retake {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+    }
+    .btn-retake:hover { background: rgba(255,255,255,0.18); }
+
+    .btn-submit {
+      background: #10b981;
+      color: #fff;
+    }
+    .btn-submit:hover:not(:disabled) { background: #059669; }
+
+    .btn-upload {
+      background: transparent;
+      border: 1.5px solid rgba(255,255,255,0.2);
+      color: #ccc;
+      font-size: 0.8rem;
+      padding: 10px;
+    }
+    .btn-upload:hover { border-color: #9A5527; color: #fff; }
+
+    /* ERROR STATE */
+    #error-state {
+      display: none;
+      padding: 24px 16px;
+      text-align: center;
+    }
+
+    #error-state .icon {
+      font-size: 3rem;
+      margin-bottom: 12px;
+    }
+
+    #error-state h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #f87171;
+    }
+
+    #error-state p {
+      font-size: 0.82rem;
+      color: #aaa;
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    /* SUCCESS */
+    #success-state {
+      display: none;
+      padding: 32px 16px;
+      text-align: center;
+    }
+
+    #success-state .icon { font-size: 3.5rem; margin-bottom: 12px; }
+    #success-state h3 { font-size: 1.1rem; font-weight: 700; color: #10b981; }
+    #success-state p { font-size: 0.82rem; color: #aaa; margin-top: 6px; }
+
+    /* Hidden file input */
+    #file-input {
+      display: none;
+    }
+
+    /* LOADING OVERLAY */
+    #loading {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid rgba(255,255,255,0.2);
+      border-top-color: #9A5527;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-text {
+      font-size: 0.82rem;
+      color: #ccc;
+      font-weight: 600;
+    }
+
+    /* FOOTER */
+    .footer {
+      padding: 10px 16px 14px;
+      text-align: center;
+      font-size: 0.68rem;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+
+<div class="card" style="position:relative;">
+
+  <!-- Loading overlay -->
+  <div id="loading" style="display:none; position:absolute; inset:0; background:rgba(0,0,0,0.7); align-items:center; justify-content:center; z-index:10; flex-direction:column; gap:12px; border-radius:20px;">
+    <div class="spinner"></div>
+    <p class="loading-text" id="loading-text">Starting camera...</p>
+  </div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div>
+        <h1>Capture Attendance</h1>
+        <p id="header-sub">Position your face in frame</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Camera view -->
+  <div class="video-wrapper" id="video-wrapper">
+    <video id="video" autoplay playsinline muted></video>
+    <span class="corner-tr"></span>
+    <span class="corner-bl"></span>
+    <div id="video-status">📷 Camera Active</div>
+  </div>
+
+  <!-- Preview view -->
+  <div id="preview-wrapper">
+    <img id="photo-preview" src="" alt="Preview">
+    <div class="preview-badge">✓ Photo Captured</div>
+  </div>
+
+  <!-- Error state -->
+  <div id="error-state">
+    <div class="icon">📷</div>
+    <h3>Camera Access Denied</h3>
+    <p>Please allow camera permission in your browser settings, or upload a photo instead.</p>
+    <button class="btn-upload" onclick="document.getElementById('file-input').click()">
+      📁 Upload Photo from Device
+    </button>
+  </div>
+
+  <!-- Success state -->
+  <div id="success-state">
+    <div class="icon">✅</div>
+    <h3>Photo Sent!</h3>
+    <p>You can close this tab now.<br>Return to the attendance portal.</p>
+  </div>
+
+  <canvas id="canvas"></canvas>
+  <input type="file" id="file-input" accept="image/*">
+
+  <!-- Controls -->
+  <div class="controls" id="controls">
+
+    <!-- Capture row -->
+    <div class="btn-row" id="capture-row">
+      <button class="btn-capture" id="btn-capture" onclick="capturePhoto()">
+        ⚡ Capture Photo
+      </button>
+      <button class="btn-switch" id="btn-switch" onclick="switchCamera()" title="Switch camera">
+        🔄
+      </button>
+    </div>
+
+    <!-- Upload alternative -->
+    <button class="btn-upload" onclick="document.getElementById('file-input').click()">
+      📁 Upload from Gallery instead
+    </button>
+
+    <!-- Retake / Submit row (hidden until capture) -->
+    <div class="btn-row" id="action-row" style="display:none;">
+      <button class="btn-retake" onclick="retake()">↩ Retake</button>
+      <button class="btn-submit" id="btn-submit" onclick="sendToParent()">
+        ✓ Use This Photo
+      </button>
+    </div>
+
+  </div>
+
+  <div class="footer">Attendance System• Secure Attendance Capture</div>
+</div>
+
+<script>
+  // ─── STATE ──────────────────────────────────────────────────────────────────
+  let stream        = null;
+  let capturedData  = null;   // base64 data URL
+  let facingMode    = 'user'; // 'user' = front, 'environment' = rear
+  let allowedOrigin = '*';    // tightened below from URL param
+
+  // ─── INIT ───────────────────────────────────────────────────────────────────
+  window.addEventListener('load', () => {
+    // Read allowed origin from ?origin= param so postMessage is scoped
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('origin')) {
+      try { allowedOrigin = decodeURIComponent(params.get('origin')); } catch(e) {}
+    }
+    startCamera();
+  });
+
+  // ─── CAMERA ─────────────────────────────────────────────────────────────────
+  async function startCamera() {
+    showLoading('Starting camera...');
+    try {
+      if (stream) stream.getTracks().forEach(t => t.stop());
+
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: facingMode,
+          width:  { ideal: 1280 },
+          height: { ideal: 960 }
+        },
+        audio: false
+      });
+
+      const video = document.getElementById('video');
+      video.srcObject = stream;
+      await video.play();
+      hideLoading();
+      showView('camera');
+    } catch (err) {
+      hideLoading();
+      console.error('Camera error:', err);
+      showView('error');
+    }
+  }
+
+  function switchCamera() {
+    facingMode = (facingMode === 'user') ? 'environment' : 'user';
+    document.getElementById('video-status').textContent =
+      facingMode === 'user' ? '🤳 Front Camera' : '📷 Rear Camera';
+    startCamera();
+  }
+
+  // ─── CAPTURE ────────────────────────────────────────────────────────────────
+  function capturePhoto() {
+    const video  = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx    = canvas.getContext('2d');
+
+    canvas.width  = video.videoWidth  || 640;
+    canvas.height = video.videoHeight || 480;
+
+    // Mirror if front camera (looks natural)
+    if (facingMode === 'user') {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    capturedData = canvas.toDataURL('image/jpeg', 0.88);
+
+    // Stop camera to save battery
+    if (stream) stream.getTracks().forEach(t => t.stop());
+
+    // Show preview
+    document.getElementById('photo-preview').src = capturedData;
+    showView('preview');
+  }
+
+  function retake() {
+    capturedData = null;
+    startCamera();
+  }
+
+  // ─── FILE UPLOAD FALLBACK ───────────────────────────────────────────────────
+  document.getElementById('file-input').addEventListener('change', function() {
+    const file = this.files[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File too large. Max 5MB.');
+      this.value = '';
+      return;
+    }
+
+    showLoading('Processing image...');
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      capturedData = e.target.result;
+      document.getElementById('photo-preview').src = capturedData;
+      hideLoading();
+      showView('preview');
+    };
+    reader.onerror = () => { hideLoading(); alert('Failed to read file.'); };
+    reader.readAsDataURL(file);
+  });
+
+  // ─── SEND TO PARENT ─────────────────────────────────────────────────────────
+  function sendToParent() {
+    if (!capturedData) { alert('No photo captured.'); return; }
+
+    showLoading('Sending photo...');
+
+    const message = {
+      type:   'FP_ATTENDANCE_PHOTO',
+      image:  capturedData,
+      ts:     Date.now()
+    };
+
+    // Send to opener (GAS app tab)
+    if (window.opener && !window.opener.closed) {
+      window.opener.postMessage(message, allowedOrigin);
+      hideLoading();
+      showView('success');
+      setTimeout(() => window.close(), 2000);
+    } else {
+      // Opener gone — store in sessionStorage as fallback
+      // GAS app polls for it
+      try {
+        sessionStorage.setItem('fp_attendance_photo', JSON.stringify(message));
+      } catch(e) {}
+      hideLoading();
+      showView('success');
+      setTimeout(() => window.close(), 2000);
+    }
+  }
+
+  // ─── VIEW MANAGER ───────────────────────────────────────────────────────────
+  function showView(view) {
+    document.getElementById('video-wrapper').style.display   = 'none';
+    document.getElementById('preview-wrapper').style.display = 'none';
+    document.getElementById('error-state').style.display     = 'none';
+    document.getElementById('success-state').style.display   = 'none';
+    document.getElementById('controls').style.display        = 'flex';
+    document.getElementById('capture-row').style.display     = 'flex';
+    document.getElementById('action-row').style.display      = 'none';
+
+    if (view === 'camera') {
+      document.getElementById('video-wrapper').style.display = 'block';
+      document.getElementById('header-sub').textContent      = 'Position your face in frame';
+    }
+    else if (view === 'preview') {
+      document.getElementById('preview-wrapper').style.display = 'block';
+      document.getElementById('capture-row').style.display     = 'none';
+      document.getElementById('action-row').style.display      = 'flex';
+      document.getElementById('header-sub').textContent        = 'Looks good? Submit or retake.';
+    }
+    else if (view === 'error') {
+      document.getElementById('error-state').style.display  = 'block';
+      document.getElementById('capture-row').style.display  = 'none';
+      document.getElementById('header-sub').textContent     = 'Camera unavailable';
+    }
+    else if (view === 'success') {
+      document.getElementById('success-state').style.display = 'block';
+      document.getElementById('controls').style.display      = 'none';
+      document.getElementById('header-sub').textContent      = 'Done!';
+    }
+  }
+
+  // ─── LOADING ────────────────────────────────────────────────────────────────
+  function showLoading(text) {
+    const el = document.getElementById('loading');
+    document.getElementById('loading-text').textContent = text || 'Please wait...';
+    el.style.display = 'flex';
+  }
+  function hideLoading() {
+    document.getElementById('loading').style.display = 'none';
+  }
+</script>
+</body>
+</html>
